@@ -1,0 +1,53 @@
+name: 'android-helloworld'
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    types: 
+      - closed
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+ apk-build-and-publish:
+   runs-on: ubuntu-latest
+   env:
+     BUILD_NAME: 'android-helloworld'
+   steps:
+     - name: Checkout
+       uses: actions/checkout@v4
+     - name: Set up Java
+       uses: actions/setup-java@v3
+       with:
+        distribution: 'temurin'
+        java-version: '17'
+     - name: JFrog CLI setup 🐸
+       uses: jfrog/setup-jfrog-cli@v4
+       env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+        JF_USER: ${{secrets.JF_USER}}
+        JF_ACCESS_TOKEN: ${{secrets.JF_ACCESS_TOKEN}}
+     - name: Health check JFrog Artifactory instance 🐸
+       run: |
+        jf --version
+        jf rt ping
+        # jf config show
+     - name: Config NPM global
+       run: |
+         # Configure the project
+         jf gradlec --repo-resolve alpha-gradle-virtual --repo-deploy alpha-gradle-virtual
+     - name: Build with Gradle
+       run: |
+        jf gradle --build-name=${{env.BUILD_NAME}} --build-number=${{ github.run_number }}
+     - name: Publish Build Info
+       run: |
+        # Collect and store environment variables in the build-info
+        jf rt bce ${{env.BUILD_NAME}} ${{github.run_number}}
+        # Collect and store VCS details in the build-info
+        jf rt bag ${{env.BUILD_NAME}} ${{github.run_number}}
+        jf rt bp ${{env.BUILD_NAME}} ${{ github.run_number }}
+     
+      
